@@ -1,0 +1,28 @@
+# Database and generated files
+db/
+run.log
+results.tsv
+final_features_report.md
+
+# Dataset files (user-provided, often large)
+data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
