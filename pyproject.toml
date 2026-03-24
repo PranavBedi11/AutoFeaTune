@@ -1,0 +1,43 @@
+[project]
+name = "autoresearch-tabular"
+version = "0.1.0"
+description = "Autonomous feature engineering agent for tabular ML"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.12"
+dependencies = [
+    "networkx>=3.0",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "scikit-learn>=1.3.0",
+    "xgboost>=2.0.0",
+    "pyyaml>=6.0",
+    "pydantic>=2.0.0",
+    "dash>=2.0.0",
+    "dash-cytoscape>=0.3.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/ashsanjay2005/autoresearch-tabular"
+Issues = "https://github.com/ashsanjay2005/autoresearch-tabular/issues"
+
+[project.scripts]
+autoresearch = "autoresearch_tabular.cli:main"
+autoresearch-inspect = "autoresearch_tabular.inspect_graph:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/autoresearch_tabular"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "ruff>=0.15.7",
+]
