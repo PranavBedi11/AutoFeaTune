@@ -163,6 +163,64 @@ def _parse_semantic_tags(program_md_path: Path, columns: list[str]) -> dict[str,
 
 
 # ---------------------------------------------------------------------------
+# 2d. Entity key identification
+# ---------------------------------------------------------------------------
+
+def _identify_entity_keys(
+    X_train: pd.DataFrame,
+    target: str,
+    categorical_columns: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Identify candidate entity group keys from categorical/low-cardinality columns.
+
+    Returns list of {columns: tuple, cardinality: int}.
+    """
+    cat_from_config = set(categorical_columns or [])
+
+    # Find categorical-like columns:
+    # 1. Explicitly listed in config.yaml categorical_columns
+    # 2. Object or category dtype
+    # 3. Integer dtype with cardinality < 100k (e.g., card1, addr1 stored as int/float)
+    # Exclude high-cardinality continuous numerics (V columns, C columns, D columns etc.)
+    cat_candidates: list[tuple[str, int]] = []
+    for col in X_train.columns:
+        if col == target:
+            continue
+        nuniq = X_train[col].nunique()
+        is_cat = (
+            col in cat_from_config
+            or X_train[col].dtype == "object"
+            or X_train[col].dtype.name == "category"
+            or (pd.api.types.is_integer_dtype(X_train[col]) and nuniq < 100_000)
+            or (pd.api.types.is_float_dtype(X_train[col]) and nuniq < 1_000)
+        )
+        if is_cat and 50 <= nuniq <= 100_000:
+            cat_candidates.append((col, nuniq))
+
+    entity_keys: list[dict[str, Any]] = []
+
+    # Singles
+    for col, card in cat_candidates:
+        entity_keys.append({"columns": (col,), "cardinality": card})
+
+    # Pairs — only from columns with individual cardinality [10, 50_000]
+    pair_eligible = [(c, n) for c, n in cat_candidates if 10 <= n <= 50_000]
+    for i, (col_a, _) in enumerate(pair_eligible):
+        for col_b, _ in pair_eligible[i + 1:]:
+            combined = X_train.groupby([col_a, col_b]).ngroups
+            if 500 <= combined <= 500_000:
+                entity_keys.append({
+                    "columns": (col_a, col_b),
+                    "cardinality": combined,
+                })
+
+    # Sort by cardinality descending — higher cardinality entity keys are typically
+    # more useful (they represent finer-grained identities like users/cards).
+    entity_keys.sort(key=lambda e: e["cardinality"], reverse=True)
+    return entity_keys[:MAX_ENTITY_KEYS]
+
+
+# ---------------------------------------------------------------------------
 # 2h. Main entry point
 # ---------------------------------------------------------------------------
 
@@ -204,6 +262,13 @@ def run_discovery() -> dict[str, Any]:
     for group, cols in semantic_groups.items():
         if cols:
             print(f"   {group}: {', '.join(cols)}")
+
+    # 2d. Identify entity keys
+    print("[4/5] Identifying entity keys ...")
+    entity_keys = _identify_entity_keys(X_train, config.target, config.categorical_columns)
+    print(f"   {len(entity_keys)} candidate entity keys.")
+    for ek in entity_keys:
+        print(f"     ({', '.join(ek['columns'])})  cardinality={ek['cardinality']:,}")
 
     elapsed = time.time() - t0
     print(f"\nDiscovery complete in {elapsed:.1f}s.")
