@@ -125,6 +125,44 @@ def profile_columns(X_train: pd.DataFrame, mg: MemoryGraph) -> None:
 
 
 # ---------------------------------------------------------------------------
+# 2b. Semantic tag parsing
+# ---------------------------------------------------------------------------
+
+def _parse_semantic_tags(program_md_path: Path, columns: list[str]) -> dict[str, list[str]]:
+    """Parse program.md for semantic column groupings based on keywords.
+
+    Returns:
+        Dict mapping semantic group name to list of column names.
+    """
+    groups: dict[str, list[str]] = {k: [] for k in SEMANTIC_KEYWORDS}
+
+    if not program_md_path.exists():
+        return groups
+
+    text = program_md_path.read_text()
+    col_set = set(columns)
+
+    # Scan each line for column names + keyword matches
+    for line in text.splitlines():
+        # Only look at lines that might be table rows or descriptions
+        line_lower = line.lower()
+
+        # Find which columns are mentioned in this line
+        mentioned = [c for c in col_set if f"`{c}`" in line or f"| {c} " in line or f"|{c}|" in line]
+        if not mentioned:
+            continue
+
+        # Check which semantic groups this line matches
+        for group, keywords in SEMANTIC_KEYWORDS.items():
+            if any(kw in line_lower for kw in keywords):
+                for col in mentioned:
+                    if col not in groups[group]:
+                        groups[group].append(col)
+
+    return groups
+
+
+# ---------------------------------------------------------------------------
 # 2h. Main entry point
 # ---------------------------------------------------------------------------
 
@@ -158,6 +196,14 @@ def run_discovery() -> dict[str, Any]:
     # 2a. Extended column profiling
     print("\n[1/5] Profiling columns ...")
     profile_columns(X_train, mg)
+
+    # 2b. Parse semantic tags
+    print("[2/5] Parsing semantic tags from program.md ...")
+    program_md = PROJECT_ROOT / "program.md"
+    semantic_groups = _parse_semantic_tags(program_md, list(X_train.columns))
+    for group, cols in semantic_groups.items():
+        if cols:
+            print(f"   {group}: {', '.join(cols)}")
 
     elapsed = time.time() - t0
     print(f"\nDiscovery complete in {elapsed:.1f}s.")
