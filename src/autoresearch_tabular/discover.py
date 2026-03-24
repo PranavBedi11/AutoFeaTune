@@ -379,9 +379,9 @@ def _variance_scan(
                 if len(stats) == 0:
                     continue
 
-                # BUG INTRODUCED (no errstate suppression)
                 # CV = std / |mean|, handle zero-mean groups
-                cvs = stats["std"] / stats["mean"].abs()
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    cvs = stats["std"] / stats["mean"].abs()
 
                 # Drop inf/nan CVs
                 cvs = cvs.replace([np.inf, -np.inf], np.nan).dropna()
